@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.1.2] - Unreleased
+
 ## [0.1.1] - 2026-03-06
 
 ### Added
@@ -22,5 +24,3 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 - Parentless blueprints no longer raise NameError when find calls same_parent? (cfb348d)
 - Snapshot-cached presets no longer produce false similarity warnings (a5bdf25)
-
-## [0.1.0] - 2026-02-25
