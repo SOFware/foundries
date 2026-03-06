@@ -77,20 +77,22 @@ module Foundries
       #
       def preset(name, &block)
         define_singleton_method(name) do
-          with_similarity_recording(name, Similarity.enabled?) do
-            if defined?(Foundries::Snapshot) && Foundries::Snapshot.enabled?
-              store = Foundries::Snapshot::Store.new(name)
+          if defined?(Foundries::Snapshot) && Foundries::Snapshot.enabled?
+            store = Foundries::Snapshot::Store.new(name)
 
-              if store.cached?
-                store.restore
-                next new # hollow — no block, data already in DB
-              end
+            if store.cached?
+              store.restore
+              next new # hollow — no block, data already in DB
+            end
 
-              store.record_empty_tables
-              foundry = new(&block)
-              store.capture
-              foundry
-            else
+            store.record_empty_tables
+            foundry = with_similarity_recording(name, Similarity.enabled?) do
+              new(&block)
+            end
+            store.capture
+            foundry
+          else
+            with_similarity_recording(name, Similarity.enabled?) do
               new(&block)
             end
           end

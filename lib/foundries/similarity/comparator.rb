@@ -17,18 +17,6 @@ module Foundries
                 ":#{preset_name(existing_key)} have identical structure " \
                 "(#{display_tree(new_tree)})"
             }
-          elsif existing_tree.contains?(new_tree)
-            warnings << {
-              pair: pair_key,
-              message: "[Foundries] Preset :#{preset_name(new_key)} is " \
-                "structurally contained within :#{preset_name(existing_key)}"
-            }
-          elsif new_tree.contains?(existing_tree)
-            warnings << {
-              pair: pair_key,
-              message: "[Foundries] Preset :#{preset_name(existing_key)} is " \
-                "structurally contained within :#{preset_name(new_key)}"
-            }
           end
         end
 

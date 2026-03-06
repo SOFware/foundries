@@ -46,7 +46,7 @@ RSpec.describe Foundries::Similarity do
         expect { foundry_class.duplicate }.to output(/identical structure/).to_stderr
       end
 
-      it "warns when one preset is contained within another" do
+      it "does not warn on containment" do
         foundry_class.preset(:full) do
           team "A" do
             user "Alice"
@@ -63,7 +63,7 @@ RSpec.describe Foundries::Similarity do
         end
 
         foundry_class.full
-        expect { foundry_class.partial }.to output(/contained within/).to_stderr
+        expect { foundry_class.partial }.not_to output.to_stderr
       end
 
       it "produces no warning when structures differ" do

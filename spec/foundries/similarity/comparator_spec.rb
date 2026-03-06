@@ -25,7 +25,7 @@ RSpec.describe Foundries::Similarity::Comparator do
       expect(warnings.first[:pair]).to contain_exactly("MyFoundry.basic", "MyFoundry.extended")
     end
 
-    it "detects containment when existing contains new" do
+    it "does not warn on containment when existing contains new" do
       small = tree("__root__", children: [tree("team")])
       large = tree("__root__", children: [
         tree("team", children: [tree("user")])
@@ -34,13 +34,10 @@ RSpec.describe Foundries::Similarity::Comparator do
 
       warnings = described_class.compare("MyFoundry.simple", small, registry)
 
-      expect(warnings.size).to eq 1
-      expect(warnings.first[:message]).to include(":simple")
-      expect(warnings.first[:message]).to include("contained within")
-      expect(warnings.first[:message]).to include(":complex")
+      expect(warnings).to be_empty
     end
 
-    it "detects containment when new contains existing" do
+    it "does not warn on containment when new contains existing" do
       small = tree("__root__", children: [tree("team")])
       large = tree("__root__", children: [
         tree("team", children: [tree("user")])
@@ -49,10 +46,7 @@ RSpec.describe Foundries::Similarity::Comparator do
 
       warnings = described_class.compare("MyFoundry.complex", large, registry)
 
-      expect(warnings.size).to eq 1
-      expect(warnings.first[:message]).to include(":simple")
-      expect(warnings.first[:message]).to include("contained within")
-      expect(warnings.first[:message]).to include(":complex")
+      expect(warnings).to be_empty
     end
 
     it "returns empty array when no similarity" do
