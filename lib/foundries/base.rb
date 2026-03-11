@@ -59,6 +59,18 @@ module Foundries
         blueprint_registry.keys.filter_map { |klass| klass.collection_name&.to_s }
       end
 
+      # Declare shorthand aliases for blueprint methods.
+      #
+      #   aliases member: :enrollment, hva_mod: :skilled_mod
+      #
+      # Resolves aliases during method_missing before blueprint
+      # delegation.
+      def aliases(mapping = nil)
+        return @aliases || {} unless mapping
+
+        @aliases = (@aliases || {}).merge(mapping)
+      end
+
       # Methods delegated from this foundry to its blueprint instances.
       def delegations
         blueprint_registry.select { |_, methods| methods.any? }
@@ -124,13 +136,14 @@ module Foundries
         # Ensure subclasses get their own registries
         subclass.instance_variable_set(:@blueprint_registry, {})
         subclass.instance_variable_set(:@extra_collections, [])
+        subclass.instance_variable_set(:@aliases, {})
       end
     end
 
     def initialize(&block)
       @_similarity_recorder = self.class._active_similarity_recorder
-      instantiate_blueprints
       initialize_collections
+      instantiate_blueprints
       @current = OpenStruct.new(resource: self)
       setup
       instance_exec(&block) if block
@@ -211,6 +224,13 @@ module Foundries
           define_singleton_method(method_name) do |*args, **kwargs, &block|
             blueprint_instance.send(method_name, *args, **kwargs, &block)
           end
+        end
+      end
+
+      # Set up alias methods that delegate to existing blueprint methods
+      self.class.aliases.each do |alias_name, target_name|
+        define_singleton_method(alias_name) do |*args, **kwargs, &block|
+          send(target_name, *args, **kwargs, &block)
         end
       end
     end

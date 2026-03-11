@@ -57,4 +57,18 @@ RSpec.describe Foundries::Blueprint do
       expect(instance.same_parent?(record)).to be true
     end
   end
+
+  describe "lookup_order" do
+    it "defaults to empty array" do
+      klass = Class.new(Foundries::Blueprint)
+      expect(klass.lookup_order).to eq []
+    end
+
+    it "stores declared lookup order" do
+      klass = Class.new(Foundries::Blueprint) do
+        lookup_order %i[phase cohort]
+      end
+      expect(klass.lookup_order).to eq %i[phase cohort]
+    end
+  end
 end

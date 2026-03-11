@@ -103,6 +103,19 @@ module Foundries
         end
       end
 
+      # Declare ancestor traversal order for ascending_find.
+      #
+      #   lookup_order %i[evented_mod phase cohort]
+      #
+      # When no parent is present, ascending_find walks these
+      # ancestor types on `current`, checking collection_name
+      # on each.
+      def lookup_order(ancestors = nil)
+        return @lookup_order || [] unless ancestors
+
+        @lookup_order = ancestors
+      end
+
       # Declare which attributes are allowed through to factory_bot.
       def permitted_attrs(attr_list)
         define_method(:permitted_attrs) do |attrs|
@@ -193,6 +206,47 @@ module Foundries
         current.resource = object
         instance_exec(&block)
       end
+    end
+
+    # Find or create: when no parent is present, walks ancestors
+    # via lookup_order; otherwise finds from parent or creates.
+    def find_or_create(name, attrs = {})
+      return ascending_find(name) unless parent_present?
+
+      find_from_parent(name) || create_object(name, attrs)
+    end
+
+    # Walk ancestor types declared in lookup_order, checking
+    # collection_name on each ancestor found in current state.
+    # Falls back to collection find.
+    def ascending_find(name)
+      object = nil
+      self.class.lookup_order.each do |ancestor_type|
+        ancestor = current.send(ancestor_type)
+        next unless ancestor
+
+        col = self.class.collection_name
+        object = ancestor.send(col).find_by(name:)
+        break if object
+      end
+
+      object || find(name)
+    end
+
+    # Whether a parent is available in the current context.
+    def parent_present?
+      parent_method = self.class.parent
+      return true if parent_method.in?(%i[self none])
+
+      parent
+    end
+
+    # Find from the parent's association, falling back to
+    # collection find.
+    def find_from_parent(name, col_name: "name")
+      col = self.class.collection_name
+      parent.send(col).find_by(col_name => name) ||
+        find(name, col_name:)
     end
 
     # Find a record in the collection by name, falling back to the database.

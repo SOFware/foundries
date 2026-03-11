@@ -334,6 +334,32 @@ RSpec.describe Foundries::Base do
     end
   end
 
+  describe "aliases" do
+    let(:aliased_foundry_class) do
+      Class.new(Foundries::Base) do
+        blueprint TeamBlueprint
+        blueprint UserBlueprint
+        aliases member: :user
+      end
+    end
+
+    it "delegates aliased methods to the target" do
+      foundry = aliased_foundry_class.new do
+        team "Engineering" do
+          member "Alice"
+        end
+      end
+
+      alice = foundry.user("Alice")
+      expect(alice).to be_a(User)
+      expect(alice.name).to eq "Alice"
+    end
+
+    it "registers aliases on the class" do
+      expect(aliased_foundry_class.aliases).to eq(member: :user)
+    end
+  end
+
   describe "parentless blueprint" do
     let(:parentless_foundry_class) do
       Class.new(Foundries::Base) do
