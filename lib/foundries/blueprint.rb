@@ -103,6 +103,19 @@ module Foundries
         end
       end
 
+      # Declare ancestor traversal order for ascending_find.
+      #
+      #   lookup_order %i[evented_mod phase cohort]
+      #
+      # When no parent is present, ascending_find walks these
+      # ancestor types on `current`, checking collection_name
+      # on each.
+      def lookup_order(ancestors = nil)
+        return @lookup_order || [] unless ancestors
+
+        @lookup_order = ancestors
+      end
+
       # Declare which attributes are allowed through to factory_bot.
       def permitted_attrs(attr_list)
         define_method(:permitted_attrs) do |attrs|
@@ -195,6 +208,47 @@ module Foundries
       end
     end
 
+    # Find or create: when no parent is present, walks ancestors
+    # via lookup_order; otherwise finds from parent or creates.
+    def find_or_create(name, attrs = {})
+      return ascending_find(name) unless parent_present?
+
+      find_from_parent(name) || create_object(name, attrs)
+    end
+
+    # Walk ancestor types declared in lookup_order, checking
+    # collection_name on each ancestor found in current state.
+    # Falls back to collection find.
+    def ascending_find(name)
+      object = nil
+      self.class.lookup_order.each do |ancestor_type|
+        ancestor = current.send(ancestor_type)
+        next unless ancestor
+
+        col = self.class.collection_name
+        object = ancestor.send(col).find_by(name:)
+        break if object
+      end
+
+      object || find(name)
+    end
+
+    # Whether a parent is available in the current context.
+    def parent_present?
+      parent_method = self.class.parent
+      return true if parent_method.in?(%i[self none])
+
+      parent
+    end
+
+    # Find from the parent's association, falling back to
+    # collection find.
+    def find_from_parent(name, col_name: "name")
+      col = self.class.collection_name
+      parent.send(col).find_by(col_name => name) ||
+        find(name, col_name:)
+    end
+
     # Find a record in the collection by name, falling back to the database.
     def find(name, col_name: "name")
       raise "#find called with nil :name, for col_name: #{col_name}." unless name
@@ -202,9 +256,13 @@ module Foundries
       found_record = collection.detect do |object|
         object.send(col_name).casecmp?(name) && same_parent?(object)
       end
+      return found_record if found_record
 
-      found_record ||
-        record_class.find_by(col_name => name)&.tap { |rec| collection << rec }
+      scope = record_class.where(col_name => name)
+      if parent_key && parent_id
+        scope = scope.where(parent_key => parent_id)
+      end
+      scope.first&.tap { |rec| collection << rec }
     end
 
     # Find a record in the collection by arbitrary criteria, falling back to the database.
@@ -254,7 +312,8 @@ module Foundries
     def method_missing(name, *args, **kwargs, &block)
       if (match = missing_find_by_request?(name))
         klass_name = match.named_captures["klass"]
-        return collection_find_by(klass_name, args)
+        attrs = kwargs.any? ? kwargs : args.first
+        return collection_find_by(klass_name, attrs)
       end
 
       if foundry.respond_to?(name)
@@ -274,8 +333,7 @@ module Foundries
       method_name.match(/^find_(?<klass>.*)_by$/)
     end
 
-    def collection_find_by(klass_name, args)
-      attrs = args.first
+    def collection_find_by(klass_name, attrs)
       target_collection_name = "#{klass_name.pluralize}_collection"
       objects = foundry.send(target_collection_name)
       objects.detect do |object|

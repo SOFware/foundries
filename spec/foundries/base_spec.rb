@@ -334,6 +334,77 @@ RSpec.describe Foundries::Base do
     end
   end
 
+  describe "aliases" do
+    let(:aliased_foundry_class) do
+      Class.new(Foundries::Base) do
+        blueprint TeamBlueprint
+        blueprint UserBlueprint
+        aliases member: :user
+      end
+    end
+
+    it "delegates aliased methods to the target" do
+      foundry = aliased_foundry_class.new do
+        team "Engineering" do
+          member "Alice"
+        end
+      end
+
+      alice = foundry.user("Alice")
+      expect(alice).to be_a(User)
+      expect(alice.name).to eq "Alice"
+    end
+
+    it "registers aliases on the class" do
+      expect(aliased_foundry_class.aliases).to eq(member: :user)
+    end
+  end
+
+  describe "inherited registries" do
+    let(:parent_foundry_class) do
+      Class.new(Foundries::Base) do
+        blueprint TeamBlueprint
+        blueprint UserBlueprint
+        aliases member: :user
+        collection :widgets
+      end
+    end
+
+    let(:child_foundry_class) { Class.new(parent_foundry_class) }
+
+    it "inherits blueprint registry from parent" do
+      expect(child_foundry_class.blueprint_registry.keys).to contain_exactly(
+        TeamBlueprint, UserBlueprint
+      )
+    end
+
+    it "inherits extra collections from parent" do
+      expect(child_foundry_class.extra_collections).to include("widgets")
+    end
+
+    it "inherits aliases from parent" do
+      expect(child_foundry_class.aliases).to eq(member: :user)
+    end
+
+    it "does not share registry references with parent" do
+      child_foundry_class.blueprint ProjectBlueprint
+
+      expect(child_foundry_class.blueprint_registry.keys).to include(ProjectBlueprint)
+      expect(parent_foundry_class.blueprint_registry.keys).not_to include(ProjectBlueprint)
+    end
+
+    it "can build records using inherited blueprints" do
+      foundry = child_foundry_class.new do
+        team "Inherited" do
+          user "Alice"
+        end
+      end
+
+      expect(foundry.team("Inherited")).to be_a(Team)
+      expect(foundry.user("Alice").team.name).to eq "Inherited"
+    end
+  end
+
   describe "parentless blueprint" do
     let(:parentless_foundry_class) do
       Class.new(Foundries::Base) do
