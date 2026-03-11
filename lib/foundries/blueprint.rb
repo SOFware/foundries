@@ -256,9 +256,13 @@ module Foundries
       found_record = collection.detect do |object|
         object.send(col_name).casecmp?(name) && same_parent?(object)
       end
+      return found_record if found_record
 
-      found_record ||
-        record_class.find_by(col_name => name)&.tap { |rec| collection << rec }
+      scope = record_class.where(col_name => name)
+      if parent_key && parent_id
+        scope = scope.where(parent_key => parent_id)
+      end
+      scope.first&.tap { |rec| collection << rec }
     end
 
     # Find a record in the collection by arbitrary criteria, falling back to the database.
@@ -308,7 +312,8 @@ module Foundries
     def method_missing(name, *args, **kwargs, &block)
       if (match = missing_find_by_request?(name))
         klass_name = match.named_captures["klass"]
-        return collection_find_by(klass_name, args)
+        attrs = kwargs.any? ? kwargs : args.first
+        return collection_find_by(klass_name, attrs)
       end
 
       if foundry.respond_to?(name)
@@ -328,8 +333,7 @@ module Foundries
       method_name.match(/^find_(?<klass>.*)_by$/)
     end
 
-    def collection_find_by(klass_name, args)
-      attrs = args.first
+    def collection_find_by(klass_name, attrs)
       target_collection_name = "#{klass_name.pluralize}_collection"
       objects = foundry.send(target_collection_name)
       objects.detect do |object|

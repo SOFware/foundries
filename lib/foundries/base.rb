@@ -133,10 +133,10 @@ module Foundries
 
       def inherited(subclass)
         super
-        # Ensure subclasses get their own registries
-        subclass.instance_variable_set(:@blueprint_registry, {})
-        subclass.instance_variable_set(:@extra_collections, [])
-        subclass.instance_variable_set(:@aliases, {})
+        # Copy parent registries so subclasses inherit blueprints
+        subclass.instance_variable_set(:@blueprint_registry, blueprint_registry.dup)
+        subclass.instance_variable_set(:@extra_collections, extra_collections.dup)
+        subclass.instance_variable_set(:@aliases, aliases.dup)
       end
     end
 
