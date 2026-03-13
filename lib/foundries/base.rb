@@ -200,6 +200,31 @@ module Foundries
     end
     alias_method :update_current, :load_state
 
+    # Build a hierarchy from a path string or array.
+    # Finds the blueprint that handles `type` and calls
+    # `ancestors` on it to recursively create the chain.
+    #
+    #   ancestors_for :task, "org/block/template/phase/mod/event" do
+    #     task "my_task"
+    #   end
+    #
+    def ancestors_for(type, path = nil, path_arr: nil, &block)
+      path_arr ||= path.split("/")
+      blueprint_for(type).ancestors(path_arr, &block)
+    end
+
+    # Find the blueprint instance that handles a given method.
+    def blueprint_for(method_name)
+      resolved = self.class.aliases[method_name] || method_name
+      self.class.delegations.each do |klass, methods|
+        if methods.include?(resolved)
+          ivar = :"@#{ivar_name_for(klass)}"
+          return instance_variable_get(ivar)
+        end
+      end
+      raise "No blueprint handles :#{method_name}"
+    end
+
     private
 
     # Override in subclasses for post-initialize hooks (e.g. pending phase rules).

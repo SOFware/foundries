@@ -41,6 +41,19 @@ RSpec.describe Foundries::Blueprint do
 
       expect(klass.parent_key).to eq :team_id
     end
+
+    it "stores ancestor type" do
+      klass = Class.new(Foundries::Blueprint) do
+        ancestor :team
+      end
+
+      expect(klass.ancestor).to eq :team
+    end
+
+    it "returns nil when no ancestor declared" do
+      klass = Class.new(Foundries::Blueprint)
+      expect(klass.ancestor).to be_nil
+    end
   end
 
   describe "default parent" do
