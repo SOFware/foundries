@@ -70,6 +70,7 @@ class ProjectBlueprint < Foundries::Blueprint
   collection :projects
   parent :team
   parent_key :team_id
+  ancestor :team
   permitted_attrs %i[name status]
 
   def project(name, attrs = {}, &block)
@@ -99,6 +100,7 @@ class TaskBlueprint < Foundries::Blueprint
   collection :tasks
   parent :project
   parent_key :project_id
+  ancestor :project
   permitted_attrs %i[name priority user_id]
 
   def task(name, attrs = {}, &block)
@@ -402,6 +404,67 @@ RSpec.describe Foundries::Base do
 
       expect(foundry.team("Inherited")).to be_a(Team)
       expect(foundry.user("Alice").team.name).to eq "Inherited"
+    end
+  end
+
+  describe "#ancestors_for" do
+    it "builds a full hierarchy from a path string" do
+      foundry = TestFoundry.new do
+        ancestors_for :task, "Engineering/API" do
+          task "Auth"
+        end
+      end
+
+      eng = foundry.team("Engineering")
+      api = foundry.project("API")
+      auth = foundry.task("Auth")
+
+      aggregate_failures do
+        expect(eng).to be_a(Team)
+        expect(api.team).to eq eng
+        expect(auth.project).to eq api
+      end
+    end
+
+    it "builds from a path array" do
+      foundry = TestFoundry.new do
+        ancestors_for :task, path_arr: %w[Dev Frontend] do
+          task "Layout"
+        end
+      end
+
+      dev = foundry.team("Dev")
+      frontend = foundry.project("Frontend")
+      layout = foundry.task("Layout")
+
+      expect(frontend.team).to eq dev
+      expect(layout.project).to eq frontend
+    end
+
+    it "handles a single-level path (terminal case)" do
+      foundry = TestFoundry.new do
+        ancestors_for :project, "Sales" do
+          project "CRM"
+        end
+      end
+
+      sales = foundry.team("Sales")
+      crm = foundry.project("CRM")
+
+      expect(crm.team).to eq sales
+    end
+  end
+
+  describe "#blueprint_for" do
+    it "finds the blueprint instance by method name" do
+      foundry = TestFoundry.new {}
+      bp = foundry.blueprint_for(:task)
+      expect(bp).to be_a(TaskBlueprint)
+    end
+
+    it "raises for unknown method" do
+      foundry = TestFoundry.new {}
+      expect { foundry.blueprint_for(:unknown) }.to raise_error(/No blueprint/)
     end
   end
 

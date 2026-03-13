@@ -116,6 +116,23 @@ module Foundries
         @lookup_order = ancestors
       end
 
+      # Declare the ancestor type for path-based hierarchy
+      # creation via `ancestors_for`.
+      #
+      #   ancestor :event
+      #
+      # Generates an `ancestors(path, &block)` method that
+      # pops the last path segment and either:
+      # - calls `foundry.send(type, name, &block)` if the
+      #   path is empty (terminal)
+      # - calls `foundry.ancestors_for(type, ...)` to
+      #   continue recursion otherwise
+      def ancestor(type = nil)
+        return @ancestor_type unless type
+
+        @ancestor_type = type
+      end
+
       # Declare which attributes are allowed through to factory_bot.
       def permitted_attrs(attr_list)
         define_method(:permitted_attrs) do |attrs|
@@ -205,6 +222,26 @@ module Foundries
         update_current(object)
         current.resource = object
         instance_exec(&block)
+      end
+    end
+
+    # Walk a path array to build ancestor hierarchy, then
+    # yield the block in the innermost context. Requires
+    # the `ancestor` class DSL to be declared.
+    #
+    #   ancestors(["org", "block", "template"], &block)
+    #
+    def ancestors(path, &block)
+      type = self.class.ancestor
+      raise "No ancestor declared for #{self.class}" unless type
+
+      name = path.pop
+      if path.empty?
+        foundry.send(type, name, &block)
+      else
+        foundry.ancestors_for(type, path_arr: path) do
+          foundry.send(type, name, &block)
+        end
       end
     end
 
