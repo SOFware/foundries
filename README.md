@@ -224,6 +224,51 @@ When two presets share identical structure or one is structurally contained with
 
 Each unique pair is warned once per process. The detection normalizes trees by deduplicating sibling nodes (keeping the richest subtree), collapsing pass-through chains, and sorting alphabetically. This means presets that build the same *shape* of data are detected regardless of the specific names or attribute values used.
 
+## Factory Usage Recording
+
+If you're migrating an existing test suite to Foundries, the recording feature can help you discover which factory call patterns appear most often — and would make good preset candidates.
+
+Add to your `spec_helper.rb`:
+
+```ruby
+require "foundries/recording"
+```
+
+Then run your suite with the environment variable:
+
+```
+FOUNDRIES_RECORD=1 bundle exec rspec
+```
+
+After the suite finishes, a summary is printed to stdout:
+
+```
+[Foundries] Recording complete. 482 tests, 3841 factory creates.
+[Foundries] Top preset candidates:
+  1. team > [project > [task], user] (34 tests, score: 102)
+  2. team > [user] (28 tests, score: 56)
+  3. team > [project > [task > [comment]], user] (12 tests, score: 60)
+[Foundries] Full report: tmp/foundries/recording.json
+```
+
+The full JSON report at `tmp/foundries/recording.json` includes per-test breakdowns and all candidates with the test names that use each pattern.
+
+### Parallel tests
+
+Recording works with [parallel_tests](https://github.com/grosser/parallel_tests). Each worker writes its own file, then a rake task merges the results:
+
+```
+FOUNDRIES_RECORD=1 bundle exec parallel_rspec
+rake foundries:recording:merge
+```
+
+To use the rake task, add to your `Rakefile`:
+
+```ruby
+require "foundries/recording/rake_task"
+Foundries::Recording::RakeTask.install
+```
+
 ## Requirements
 
 - Ruby >= 4.0
