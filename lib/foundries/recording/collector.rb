@@ -33,13 +33,9 @@ module Foundries
         @current_root = nil
       end
 
-      def results
-        @results
-      end
+      attr_reader :results
 
-      def total_creates
-        @total_creates
-      end
+      attr_reader :total_creates
 
       # @api private — called by the Subscriber
       def handle_start(payload)

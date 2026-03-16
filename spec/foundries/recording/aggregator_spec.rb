@@ -144,7 +144,7 @@ RSpec.describe Foundries::Recording::Aggregator do
         node(:project)
       )
 
-      results = { "test A" => tree, "test B" => tree }
+      results = {"test A" => tree, "test B" => tree}
 
       aggregator = described_class.new(results)
       candidates = aggregator.candidates
@@ -157,7 +157,7 @@ RSpec.describe Foundries::Recording::Aggregator do
     it "uses subtree signature directly for subtree candidates" do
       tree = root(node(:team, children: [node(:project), node(:user)]))
 
-      results = { "test A" => tree, "test B" => tree }
+      results = {"test A" => tree, "test B" => tree}
 
       aggregator = described_class.new(results)
       candidates = aggregator.candidates

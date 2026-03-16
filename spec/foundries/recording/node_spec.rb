@@ -146,7 +146,7 @@ RSpec.describe Foundries::Recording::Node do
       expect(parent.to_h).to eq({
         factory: "team",
         traits: ["active"],
-        children: [{ factory: "project", traits: [], children: [] }]
+        children: [{factory: "project", traits: [], children: []}]
       })
     end
   end
@@ -187,7 +187,6 @@ RSpec.describe Foundries::Recording::Node do
     end
 
     it "works correctly in a Set" do
-      require "set"
       a = node(:user, traits: [:admin])
       b = node(:user, traits: [:admin])
       set = Set.new([a, b])
