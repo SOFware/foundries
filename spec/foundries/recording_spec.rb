@@ -78,6 +78,35 @@ RSpec.describe Foundries::Recording do
     end
   end
 
+  describe ".worker_output_path" do
+    it "returns default path when not in a parallel worker" do
+      allow(ENV).to receive(:[]).with("TEST_ENV_NUMBER").and_return(nil)
+      expect(described_class.worker_output_path).to eq("tmp/foundries/recording.json")
+    end
+
+    it "includes worker number when TEST_ENV_NUMBER is set" do
+      allow(ENV).to receive(:[]).with("TEST_ENV_NUMBER").and_return("3")
+      expect(described_class.worker_output_path).to eq("tmp/foundries/recording-3.json")
+    end
+
+    it "falls back to PID when TEST_ENV_NUMBER is empty string" do
+      allow(ENV).to receive(:[]).with("TEST_ENV_NUMBER").and_return("")
+      allow(Process).to receive(:pid).and_return(12345)
+      expect(described_class.worker_output_path).to eq("tmp/foundries/recording-12345.json")
+    end
+
+    it "returns plain output_path when TEST_ENV_NUMBER is nil" do
+      allow(ENV).to receive(:[]).with("TEST_ENV_NUMBER").and_return(nil)
+      expect(described_class.worker_output_path).to eq(described_class.output_path)
+    end
+
+    it "respects custom output_path" do
+      described_class.output_path = "custom/dir/results.json"
+      allow(ENV).to receive(:[]).with("TEST_ENV_NUMBER").and_return("7")
+      expect(described_class.worker_output_path).to eq("custom/dir/results-7.json")
+    end
+  end
+
   describe ".report!" do
     let(:tmp_dir) { "tmp/foundries_test_#{Process.pid}" }
     let(:output_path) { "#{tmp_dir}/recording.json" }

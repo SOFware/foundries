@@ -170,4 +170,96 @@ RSpec.describe Foundries::Recording::Reporter do
       expect(output).to include("[Foundries] Top preset candidates:")
     end
   end
+
+  describe ".merge_files" do
+    def write_worker_json(dir, filename, total_creates:, per_test:)
+      data = {
+        recorded_at: Time.now.utc.iso8601,
+        total_tests: per_test.size,
+        total_factory_creates: total_creates,
+        candidates: [],
+        per_test: per_test
+      }
+      path = File.join(dir, filename)
+      File.write(path, JSON.pretty_generate(data))
+      path
+    end
+
+    it "merges multiple JSON files with correct totals and keys" do
+      Dir.mktmpdir do |dir|
+        path1 = write_worker_json(dir, "worker1.json",
+          total_creates: 10,
+          per_test: {
+            "test A" => {
+              factories_created: 1,
+              tree: [{factory: "team", traits: [], children: [{factory: "user", traits: [], children: []}]}]
+            }
+          })
+
+        path2 = write_worker_json(dir, "worker2.json",
+          total_creates: 20,
+          per_test: {
+            "test B" => {
+              factories_created: 1,
+              tree: [{factory: "team", traits: [], children: [{factory: "project", traits: [], children: []}]}]
+            }
+          })
+
+        output_path = File.join(dir, "merged.json")
+        described_class.merge_files([path1, path2], output_path: output_path)
+
+        data = JSON.parse(File.read(output_path))
+        expect(data["total_tests"]).to eq(2)
+        expect(data["total_factory_creates"]).to eq(30)
+        expect(data["per_test"].keys).to contain_exactly("test A", "test B")
+        expect(data["candidates"]).to be_an(Array)
+      end
+    end
+
+    it "returns a summary string with correct counts" do
+      Dir.mktmpdir do |dir|
+        path1 = write_worker_json(dir, "worker1.json",
+          total_creates: 5,
+          per_test: {
+            "test A" => {
+              factories_created: 1,
+              tree: [{factory: "team", traits: [], children: []}]
+            }
+          })
+
+        output_path = File.join(dir, "merged.json")
+        summary = described_class.merge_files([path1], output_path: output_path)
+
+        expect(summary).to include("1 tests")
+        expect(summary).to include("5 factory creates")
+        expect(summary).to include("[Foundries] Full report:")
+      end
+    end
+
+    it "re-aggregates to find patterns across workers" do
+      Dir.mktmpdir do |dir|
+        shared_tree = [{factory: "team", traits: [], children: [{factory: "user", traits: [], children: []}]}]
+
+        path1 = write_worker_json(dir, "worker1.json",
+          total_creates: 2,
+          per_test: {
+            "test A" => {factories_created: 1, tree: shared_tree}
+          })
+
+        path2 = write_worker_json(dir, "worker2.json",
+          total_creates: 2,
+          per_test: {
+            "test B" => {factories_created: 1, tree: shared_tree}
+          })
+
+        output_path = File.join(dir, "merged.json")
+        described_class.merge_files([path1, path2], output_path: output_path)
+
+        data = JSON.parse(File.read(output_path))
+        candidate = data["candidates"].find { |c| c["structure"] == "team > [user]" }
+        expect(candidate).not_to be_nil
+        expect(candidate["frequency"]).to eq(2)
+      end
+    end
+  end
 end

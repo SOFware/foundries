@@ -4,11 +4,47 @@ require "json"
 require "time"
 require "fileutils"
 require_relative "aggregator"
+require_relative "node"
 
 module Foundries
   module Recording
     class Reporter
       MAX_STDOUT_CANDIDATES = 10
+
+      def self.merge_files(paths, output_path:)
+        combined_per_test = {}
+        total_creates = 0
+
+        paths.each do |path|
+          data = JSON.parse(File.read(path))
+          total_creates += data["total_factory_creates"]
+          data["per_test"].each do |test_id, test_data|
+            combined_per_test[test_id] = test_data
+          end
+        end
+
+        total_tests = combined_per_test.size
+
+        results = combined_per_test.transform_values do |test_data|
+          children = (test_data["tree"] || []).map { |h| node_from_hash(h) }
+          Node.new(factory: :__root__, children: children)
+        end
+
+        reporter = new(results: results, total_creates: total_creates, total_tests: total_tests)
+        reporter.write_json(output_path)
+        reporter.summary(json_path: output_path)
+      end
+
+      def self.node_from_hash(hash)
+        children = (hash["children"] || []).map { |c| node_from_hash(c) }
+        Node.new(
+          factory: hash["factory"].to_sym,
+          traits: (hash["traits"] || []).map(&:to_sym),
+          children: children
+        )
+      end
+
+      private_class_method :node_from_hash
 
       def initialize(results:, total_creates:, total_tests:)
         @results = results

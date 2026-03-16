@@ -23,6 +23,16 @@ module Foundries
         @output_path || DEFAULT_OUTPUT_PATH
       end
 
+      def worker_output_path
+        worker_id = ENV["TEST_ENV_NUMBER"]
+        return output_path if worker_id.nil?
+
+        suffix = worker_id.empty? ? Process.pid.to_s : worker_id
+        base = output_path
+        ext = File.extname(base)
+        "#{base.chomp(ext)}-#{suffix}#{ext}"
+      end
+
       def reset!
         @collector = nil
         @enabled = nil
@@ -36,8 +46,9 @@ module Foundries
           total_creates: collector.total_creates,
           total_tests: total_tests
         )
-        reporter.write_json(output_path)
-        $stdout.puts reporter.summary(json_path: output_path)
+        path = worker_output_path
+        reporter.write_json(path)
+        $stdout.puts reporter.summary(json_path: path)
       end
     end
   end
