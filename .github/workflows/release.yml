@@ -10,3 +10,6 @@ jobs:
       git_user_email: 'gems@sofwarellc.com'
       git_user_name: 'SOFware'
       ruby_version: '4.0'
+      # checksums/ has been committed since 0.1.0, but the shared workflow made
+      # generation opt-in and off by default, so 0.1.1-0.1.4 published without one.
+      generate_checksum: true
