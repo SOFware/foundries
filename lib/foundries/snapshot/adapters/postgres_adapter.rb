@@ -16,6 +16,10 @@ module Foundries
           @connection.select_value("SELECT NOT EXISTS (SELECT 1 FROM #{quoted(table_name)})")
         end
 
+        def count(table_name)
+          @connection.select_value("SELECT COUNT(*) FROM #{quoted(table_name)}")
+        end
+
         def capture(table_name, io)
           raw = @connection.raw_connection
           raw.copy_data("COPY #{quoted(table_name)} TO STDOUT") do

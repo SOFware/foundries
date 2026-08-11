@@ -25,11 +25,34 @@ module Foundries
 
       # Record which tables are empty before the preset block runs.
       # Only these tables will be captured after the block completes.
+      #
+      # The already-populated tables are counted too, so #capture can tell
+      # whether the preset wrote into one of them. A preset that only updates
+      # existing rows leaves the count unchanged and slips past this check;
+      # presets insert, so the count is a good enough signal.
       def record_empty_tables
-        @capturable_tables = @adapter.table_names.select { |t| @adapter.empty?(t) }
+        @capturable_tables = []
+        @preexisting_counts = {}
+
+        @adapter.table_names.each do |table|
+          if @adapter.empty?(table)
+            @capturable_tables << table
+          else
+            @preexisting_counts[table] = @adapter.count(table)
+          end
+        end
       end
 
       def capture
+        spoiled = spoiled_tables
+        unless spoiled.empty?
+          warn "[Foundries] Not caching preset :#{@preset_name} — it wrote to " \
+            "#{spoiled.join(", ")}, which already held rows when it ran. " \
+            "Only tables the preset fills from empty can be snapshotted, so " \
+            "caching this would restore an incomplete tree."
+          return
+        end
+
         tables = @capturable_tables || @adapter.table_names
 
         tmp_dir = Pathname.new("#{cache_dir}.#{$$}.tmp")
@@ -63,6 +86,17 @@ module Foundries
       end
 
       private
+
+      # Pre-populated tables whose row count moved while the preset ran. Their
+      # new rows can't be told apart from the ones that were already there, so
+      # the snapshot would silently omit them.
+      def spoiled_tables
+        return [] unless @preexisting_counts
+
+        @preexisting_counts.filter_map do |table, count|
+          table unless @adapter.count(table) == count
+        end
+      end
 
       def cache_dir
         @cache_dir ||= Pathname.new(@storage_path).join(@preset_name)
