@@ -98,6 +98,51 @@ RSpec.describe Foundries::Snapshot::Store do
     end
   end
 
+  describe "#capture with a table that was not empty beforehand" do
+    it "refuses to write a snapshot when the preset adds to a pre-populated table" do
+      create(:team, name: "Pre-existing")
+
+      store = described_class.new(:test_preset, adapter: adapter, storage_path: storage_path)
+      store.record_empty_tables
+
+      # The preset adds to `teams` (already populated) and to `users` (empty).
+      team = create(:team, name: "From preset")
+      create(:user, name: "Alice", team: team)
+
+      expect { store.capture }.to output.to_stderr
+
+      expect(store).not_to be_cached
+      expect(Pathname.new(storage_path).join("test_preset")).not_to exist
+    end
+
+    it "warns naming the preset and the tables it could not capture" do
+      create(:team, name: "Pre-existing")
+
+      store = described_class.new(:test_preset, adapter: adapter, storage_path: storage_path)
+      store.record_empty_tables
+      create(:team, name: "From preset")
+
+      expect { store.capture }.to output(/test_preset.*teams/m).to_stderr
+    end
+
+    it "captures normally when the pre-populated table is left untouched" do
+      create(:team, name: "Pre-existing")
+
+      store = described_class.new(:test_preset, adapter: adapter, storage_path: storage_path)
+      store.record_empty_tables
+
+      team = Team.first
+      create(:user, name: "Alice", team: team)
+
+      store.capture
+
+      expect(store).to be_cached
+      cache_dir = Pathname.new(storage_path).join("test_preset")
+      expect(cache_dir.join("users.dat")).to exist
+      expect(cache_dir.join("teams.dat")).not_to exist
+    end
+  end
+
   describe "source_paths invalidation" do
     let(:source_dir) { Dir.mktmpdir("foundries_source") }
     let(:source_file) { File.join(source_dir, "foundry.rb") }

@@ -13,7 +13,11 @@ module Foundries
         end
 
         def empty?(table_name)
-          @connection.select_value("SELECT COUNT(*) FROM #{quoted(table_name)}") == 0
+          count(table_name) == 0
+        end
+
+        def count(table_name)
+          @connection.select_value("SELECT COUNT(*) FROM #{quoted(table_name)}")
         end
 
         def capture(table_name, io)

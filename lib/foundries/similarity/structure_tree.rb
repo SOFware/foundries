@@ -66,7 +66,7 @@ module Foundries
         if children.empty?
           name
         else
-          "#{name} > [#{children.map(&:to_s).join(", ")}]"
+          "#{name} > [#{children.join(", ")}]"
         end
       end
     end

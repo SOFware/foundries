@@ -28,7 +28,7 @@ module Foundries
       end
 
       def self.display_tree(tree)
-        tree.children.map(&:to_s).join(", ")
+        tree.children.join(", ")
       end
 
       private_class_method :preset_name, :display_tree
