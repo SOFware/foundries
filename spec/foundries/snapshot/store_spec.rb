@@ -3,6 +3,39 @@
 require "spec_helper"
 require "tmpdir"
 
+# Minimal fake adapter standing in for any adapter (e.g. PostgresAdapter)
+# that hands Store raw ASCII-8BIT bytes, as `raw.get_copy_data` does.
+class BinaryDataAdapter
+  def initialize(connection, bytes)
+    @connection = connection
+    @bytes = bytes
+    @restored = {}
+  end
+
+  def table_names
+    ["widgets"]
+  end
+
+  def capture(_table_name, io)
+    io.write(@bytes)
+  end
+
+  def restore(table_name, io)
+    @restored[table_name] = io.read
+  end
+
+  def disable_referential_integrity
+    yield
+  end
+
+  def reset_sequence(_table_name)
+  end
+
+  def restored_bytes(table_name)
+    @restored[table_name]
+  end
+end
+
 RSpec.describe Foundries::Snapshot::Store do
   let(:storage_path) { Dir.mktmpdir("foundries_test") }
   let(:connection) { ActiveRecord::Base.connection }
@@ -140,6 +173,25 @@ RSpec.describe Foundries::Snapshot::Store do
       cache_dir = Pathname.new(storage_path).join("test_preset")
       expect(cache_dir.join("users.dat")).to exist
       expect(cache_dir.join("teams.dat")).not_to exist
+    end
+  end
+
+  describe "capture and restore of binary data" do
+    it "round-trips ASCII-8BIT bytes with high bytes without corruption" do
+      binary_bytes = "S\xC3\xA9bastien \xE2\x80\x94 signed".b
+      binary_adapter = BinaryDataAdapter.new(connection, binary_bytes)
+      store = described_class.new(:binary_preset, adapter: binary_adapter, storage_path: storage_path)
+
+      original_internal = Encoding.default_internal
+      Encoding.default_internal = Encoding::UTF_8
+      begin
+        store.capture
+        store.restore
+      ensure
+        Encoding.default_internal = original_internal
+      end
+
+      expect(binary_adapter.restored_bytes("widgets")).to eq(binary_bytes)
     end
   end
 
