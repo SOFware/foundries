@@ -6,6 +6,8 @@ require "tmpdir"
 # Minimal fake adapter standing in for any adapter (e.g. PostgresAdapter)
 # that hands Store raw ASCII-8BIT bytes, as `raw.get_copy_data` does.
 class BinaryDataAdapter
+  # @connection looks unused here but is not: Store#initialize builds its
+  # Fingerprint from `adapter.instance_variable_get(:@connection)`.
   def initialize(connection, bytes)
     @connection = connection
     @bytes = bytes
@@ -182,6 +184,9 @@ RSpec.describe Foundries::Snapshot::Store do
       binary_adapter = BinaryDataAdapter.new(connection, binary_bytes)
       store = described_class.new(:binary_preset, adapter: binary_adapter, storage_path: storage_path)
 
+      # Text-mode IO#write only transcodes — and so only raises — when an
+      # internal encoding is set. Rails sets one from `config.encoding`, which
+      # is why this surfaced in an app and not in this suite.
       original_internal = Encoding.default_internal
       Encoding.default_internal = Encoding::UTF_8
       begin
