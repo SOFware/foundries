@@ -55,10 +55,14 @@ module Foundries
           )
           return unless seq
 
-          max_id = @connection.select_value(
-            "SELECT COALESCE(MAX(#{@connection.quote_column_name(pk)}), 0) FROM #{quoted(table_name)}"
+          # setval is not transactional, and rows can already be committed
+          # past the restored data (e.g. seeded outside this transaction), so
+          # the sequence must only ever move forward.
+          @connection.execute(
+            "SELECT setval(#{@connection.quote(seq)}, GREATEST(" \
+            "(SELECT COALESCE(MAX(#{@connection.quote_column_name(pk)}), 0) FROM #{quoted(table_name)}), " \
+            "(SELECT last_value FROM #{seq})))"
           )
-          @connection.execute("SELECT setval(#{@connection.quote(seq)}, #{max_id})")
         end
 
         private
