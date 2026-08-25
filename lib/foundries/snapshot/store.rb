@@ -59,7 +59,7 @@ module Foundries
         tmp_dir.mkpath
 
         tables.each do |table|
-          tmp_dir.join("#{table}.dat").open("w") do |f|
+          tmp_dir.join("#{table}.dat").open("wb") do |f|
             @adapter.capture(table, f)
           end
         end
@@ -77,7 +77,7 @@ module Foundries
             next unless file.size > 0
 
             table = file.basename(".dat").to_s
-            file.open("r") do |f|
+            file.open("rb") do |f|
               @adapter.restore(table, f)
             end
             @adapter.reset_sequence(table)
