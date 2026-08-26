@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    foundries (0.1.6)
+    foundries (0.1.7)
       factory_bot (>= 6.0)
       ostruct
 
