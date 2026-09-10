@@ -200,6 +200,36 @@ RSpec.describe Foundries::Snapshot::Store do
     end
   end
 
+  describe "incomplete snapshots" do
+    it "rejects a missing table before restoring any rows" do
+      store = described_class.new(:test_preset, adapter: adapter, storage_path: storage_path)
+      create(:team, name: "Cached")
+      store.capture
+      FileUtils.rm(Pathname.new(storage_path).join("test_preset/teams.dat"))
+
+      expect(store).not_to be_cached
+      expect(adapter).not_to receive(:restore)
+      expect { store.restore }.to raise_error(/incomplete snapshot/)
+    end
+
+    it "invalidates old snapshots without a table manifest" do
+      store = described_class.new(:test_preset, adapter: adapter, storage_path: storage_path)
+      store.capture
+      FileUtils.rm(Pathname.new(storage_path).join("test_preset/.tables"))
+      expect(store).not_to be_cached
+    end
+
+    it "preserves the previous cache and cleans staging after a failed capture" do
+      store = described_class.new(:test_preset, adapter: adapter, storage_path: storage_path)
+      store.capture
+      allow(adapter).to receive(:capture).and_raise("disk full")
+
+      expect { store.capture }.to raise_error("disk full")
+      expect(store).to be_cached
+      expect(Dir.children(storage_path)).to contain_exactly("test_preset", "test_preset.lock")
+    end
+  end
+
   describe "source_paths invalidation" do
     let(:source_dir) { Dir.mktmpdir("foundries_source") }
     let(:source_file) { File.join(source_dir, "foundry.rb") }
