@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "tmpdir"
 
 module Foundries
   module Snapshot
@@ -18,9 +19,7 @@ module Foundries
       end
 
       def cached?
-        cache_dir.exist? &&
-          cache_dir.join(".fingerprint").exist? &&
-          cache_dir.join(".fingerprint").read.strip == @fingerprint.current
+        with_lock { valid_cache? }
       end
 
       # Record which tables are empty before the preset block runs.
@@ -55,8 +54,8 @@ module Foundries
 
         tables = @capturable_tables || @adapter.table_names
 
-        tmp_dir = Pathname.new("#{cache_dir}.#{$$}.tmp")
-        tmp_dir.mkpath
+        FileUtils.mkdir_p(@storage_path)
+        tmp_dir = Pathname.new(Dir.mktmpdir("#{@preset_name}.", @storage_path))
 
         tables.each do |table|
           tmp_dir.join("#{table}.dat").open("wb") do |f|
@@ -64,28 +63,49 @@ module Foundries
           end
         end
 
+        tmp_dir.join(".tables").write(tables.join("\n"))
         tmp_dir.join(".fingerprint").write(@fingerprint.current)
 
-        # Atomic swap
-        FileUtils.rm_rf(cache_dir) if cache_dir.exist?
-        FileUtils.mv(tmp_dir, cache_dir)
+        with_lock do
+          FileUtils.rm_rf(cache_dir)
+          FileUtils.mv(tmp_dir, cache_dir)
+        end
+      ensure
+        FileUtils.rm_rf(tmp_dir) if tmp_dir
       end
 
       def restore
-        @adapter.disable_referential_integrity do
-          cache_dir.glob("*.dat").each do |file|
-            next unless file.size > 0
+        with_lock do
+          raise "Invalid or incomplete snapshot: #{@preset_name}" unless valid_cache?
 
-            table = file.basename(".dat").to_s
-            file.open("rb") do |f|
-              @adapter.restore(table, f)
+          @adapter.disable_referential_integrity do
+            captured_tables.each do |table|
+              file = cache_dir.join("#{table}.dat")
+              next unless file.size > 0
+
+              file.open("rb") { |io| @adapter.restore(table, io) }
+              @adapter.reset_sequence(table)
             end
-            @adapter.reset_sequence(table)
           end
         end
       end
 
       private
+
+      def with_lock(&block)
+        Snapshot.with_lock(@preset_name, storage_path: @storage_path, &block)
+      end
+
+      def captured_tables
+        cache_dir.join(".tables").read.lines.map(&:chomp)
+      end
+
+      def valid_cache?
+        stamp = cache_dir.join(".fingerprint")
+        stamp.file? && stamp.read.strip == @fingerprint.current &&
+          cache_dir.join(".tables").file? &&
+          captured_tables.all? { |table| cache_dir.join("#{table}.dat").file? }
+      end
 
       # Pre-populated tables whose row count moved while the preset ran. Their
       # new rows can't be told apart from the ones that were already there, so

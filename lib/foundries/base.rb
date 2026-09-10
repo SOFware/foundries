@@ -187,7 +187,9 @@ module Foundries
 
     def execute_and_restore_state
       initial_state = @current.dup
-      yield.tap { @current = initial_state }
+      yield
+    ensure
+      @current = initial_state
     end
 
     def load_state(object)
