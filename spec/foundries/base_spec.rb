@@ -293,6 +293,18 @@ RSpec.describe Foundries::Base do
   end
 
   describe "state isolation" do
+    it "restores parent context after a nested block raises" do
+      foundry = TestFoundry.new
+      expect do
+        foundry.reopen do
+          team("Failed") { raise "invalid child" }
+        end
+      end.to raise_error("invalid child")
+
+      expect(foundry.current.team).to be_nil
+      expect(foundry.user("Unassigned").team).to be_nil
+    end
+
     it "scopes parent context to nested blocks" do
       foundry = TestFoundry.new do
         team "A" do
