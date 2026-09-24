@@ -43,12 +43,13 @@ module Foundries
         ENV["FOUNDRIES_CACHE"] == "1"
       end
 
+      # Built per call so a restore always runs on the caller's current
+      # connection, inside its transaction.
       def adapter
-        @adapter ||= Adapter.for(connection)
+        Adapter.for(connection)
       end
 
       def reset!
-        @adapter = nil
         @source_paths = nil
       end
     end
