@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
 module Foundries
-  VERSION = "0.1.8"
-  RELEASE_DATE = "2026-10-05"
+  VERSION = "0.1.9"
+  RELEASE_DATE = "Unreleased"
 end
